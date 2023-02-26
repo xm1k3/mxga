@@ -1,4 +1,4 @@
-package keys
+package utils
 
 import (
 	"io/ioutil"
