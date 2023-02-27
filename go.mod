@@ -3,9 +3,12 @@ module github.com/xm1k3/mxga
 go 1.19
 
 require (
+	github.com/multiversx/mx-chain-crypto-go v1.2.5
 	github.com/multiversx/mx-sdk-go v1.2.5
+	github.com/shopspring/decimal v1.3.1
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/viper v1.15.0
+	gopkg.in/yaml.v2 v2.4.0
 )
 
 require (
@@ -24,7 +27,6 @@ require (
 	github.com/mr-tron/base58 v1.2.0 // indirect
 	github.com/multiversx/concurrent-map v0.1.4 // indirect
 	github.com/multiversx/mx-chain-core-go v1.1.30 // indirect
-	github.com/multiversx/mx-chain-crypto-go v1.2.5 // indirect
 	github.com/multiversx/mx-chain-go v1.4.4 // indirect
 	github.com/multiversx/mx-chain-logger-go v1.0.11 // indirect
 	github.com/multiversx/mx-chain-p2p-go v1.0.10 // indirect

@@ -6,7 +6,9 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sync"
 
+	"github.com/shopspring/decimal"
 	"github.com/spf13/viper"
 	"github.com/xm1k3/mxga/pkg/core"
 	"github.com/xm1k3/mxga/pkg/core/services"
@@ -27,7 +29,7 @@ func GetController(mode string) Controller {
 	return controller
 }
 
-func CreateWallet(folderPath string, password string, qty int, mode string) {
+func CreateWallet(password string, qty int, mode string) {
 	controller := GetController(mode)
 
 	savePath := filepath.Dir(viper.ConfigFileUsed())
@@ -53,4 +55,26 @@ func CreateWallet(folderPath string, password string, qty int, mode string) {
 	}
 
 	fmt.Println("Report created here: ", path.Join(savePath, "report.txt"))
+}
+
+func SendTransactions(pemPath string, to []string, amount decimal.Decimal, data string, mode string) {
+	controller := GetController(mode)
+	hashes, err := controller.Service.SendTransactions(pemPath, to, amount, data)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(len(to))
+	for i := 0; i < len(hashes); i++ {
+		go func(i int) {
+			defer wg.Done()
+			status, err := controller.Service.GetTrxStatus(hashes[i])
+			if err != nil {
+				log.Fatal(err)
+			}
+			fmt.Println("[", status, "] Hash: ", hashes[i])
+		}(i)
+	}
+	wg.Wait()
 }
