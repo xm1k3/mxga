@@ -20,9 +20,18 @@ type Config struct {
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "mxga",
-	Short: "MultiversX Golang Api, tool for interact with API & Blockchain",
-	Long:  `MultiversX Golang Api, tool for interact with API & Blockchain`,
+	Use: "mxga",
+	Long: `
+███╗   ███╗██╗  ██╗ ██████╗  █████╗ 
+████╗ ████║╚██╗██╔╝██╔════╝ ██╔══██╗
+██╔████╔██║ ╚███╔╝ ██║  ███╗███████║
+██║╚██╔╝██║ ██╔██╗ ██║   ██║██╔══██║
+██║ ╚═╝ ██║██╔╝ ██╗╚██████╔╝██║  ██║
+╚═╝     ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝
+
+MultiversX Golang Api, tool for interact with API & Blockchain
+By xm1k3
+`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	// Run: func(cmd *cobra.Command, args []string) { },
@@ -39,6 +48,8 @@ func Execute() {
 
 func init() {
 	cobra.OnInitialize(initConfig)
+
+	rootCmd.CompletionOptions.DisableDefaultCmd = true
 
 	rootCmd.PersistentFlags().StringP("mode", "M", "mainnet", "multiversx mode (mainnet, testnet, devnet)")
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.config/mxga/mxga.yaml)")

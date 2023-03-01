@@ -72,7 +72,7 @@ var retrieveCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(retrieveCmd)
 
-	retrieveCmd.Flags().Float32P("value", "v", 0.5, "value")
+	retrieveCmd.Flags().Float32P("value", "v", 0.1, "value")
 	retrieveCmd.Flags().StringP("data", "d", "", "data")
 	retrieveCmd.Flags().BoolP("all", "a", false, "retrieve all money from all wallets")
 
