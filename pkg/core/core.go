@@ -31,5 +31,7 @@ type MultiversxNetService interface {
 	CreateWallet(folderPath string, password string) (Wallet, error)
 	SendTransactions(pemPath string, to []string, amount decimal.Decimal, dataStr string) ([]string, error)
 
+	GetAccount(address string) (string, error)
+
 	GetTrxStatus(hash string) (string, error)
 }

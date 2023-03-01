@@ -78,3 +78,44 @@ func SendTransactions(pemPath string, to []string, amount decimal.Decimal, data 
 	}
 	wg.Wait()
 }
+
+func Retrieve(walletsAddr []string, walletsPemPath []string, mainAddress string, amount decimal.Decimal, datastr string, mode string, all bool) {
+	controller := GetController(mode)
+	var hashes []string
+	for i, wallet := range walletsPemPath {
+		var mainStr []string
+
+		// retrieve all account data
+		if all {
+			amountStr, err := controller.Service.GetAccount(walletsAddr[i])
+			if err != nil {
+				log.Fatal(err)
+			}
+			amount, err = decimal.NewFromString(amountStr)
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
+
+		mainStr = append(mainStr, mainAddress)
+		hash, err := controller.Service.SendTransactions(wallet, mainStr, amount, datastr)
+		if err != nil {
+			log.Fatal(err)
+		}
+		hashes = append(hashes, hash...)
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(len(hashes))
+	for i := 0; i < len(hashes); i++ {
+		go func(i int) {
+			defer wg.Done()
+			status, err := controller.Service.GetTrxStatus(hashes[i])
+			if err != nil {
+				log.Fatal(err)
+			}
+			fmt.Println("[", status, "] Hash: ", hashes[i])
+		}(i)
+	}
+	wg.Wait()
+}

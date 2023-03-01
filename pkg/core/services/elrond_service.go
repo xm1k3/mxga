@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path"
 	"path/filepath"
@@ -206,4 +207,39 @@ func (m MultiversxService) GetTrxStatus(hash string) (string, error) {
 
 		time.Sleep(1 * time.Second)
 	}
+}
+
+func (m MultiversxService) GetAccount(address string) (string, error) {
+	args := blockchain.ArgsProxy{
+		ProxyURL:            m.ProxyUrl,
+		Client:              nil,
+		SameScState:         false,
+		ShouldBeSynced:      false,
+		FinalityCheck:       false,
+		CacheExpirationTime: time.Minute,
+		EntityType:          mxcore.Proxy,
+	}
+	ep, err := blockchain.NewProxy(args)
+
+	networkConfig, err := ep.GetNetworkConfig(context.Background())
+	if err != nil {
+		return "", err
+	}
+
+	addr, err := data.NewAddressFromBech32String(address)
+	if err != nil {
+		return "", err
+	}
+
+	accountInfo, err := ep.GetAccount(context.Background(), addr)
+	if err != nil {
+		return "", err
+	}
+
+	floatBalance, err := accountInfo.GetBalance(networkConfig.Denomination)
+	if err != nil {
+		return "", err
+	}
+	floatBalance = floatBalance - 0.02
+	return fmt.Sprintf("%.6f", floatBalance), nil
 }
