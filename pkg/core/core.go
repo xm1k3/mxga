@@ -32,6 +32,5 @@ type MultiversxNetService interface {
 	SendTransactions(pemPath string, to []string, amount decimal.Decimal, dataStr string) ([]string, error)
 
 	GetAccount(address string) (string, error)
-
 	GetTrxStatus(hash string) (string, error)
 }
