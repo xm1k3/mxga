@@ -10,13 +10,12 @@ import (
 
 	"github.com/shopspring/decimal"
 	"github.com/spf13/viper"
-	"github.com/xm1k3/mxga/pkg/core"
 	"github.com/xm1k3/mxga/pkg/core/services"
 	"github.com/xm1k3/mxga/pkg/utils"
 )
 
 type Controller struct {
-	Service core.MultiversxNetService
+	Service services.MultiversxService
 }
 
 func GetController(mode string) Controller {
@@ -87,14 +86,11 @@ func Retrieve(walletsAddr []string, walletsPemPath []string, mainAddress string,
 
 		// retrieve all account data
 		if all {
-			amountStr, err := controller.Service.GetAccount(walletsAddr[i])
+			amountFloat64, err := controller.Service.GetAccount(walletsAddr[i])
 			if err != nil {
 				log.Fatal(err)
 			}
-			amount, err = decimal.NewFromString(amountStr)
-			if err != nil {
-				log.Fatal(err)
-			}
+			amount = decimal.NewFromFloat(amountFloat64)
 		}
 
 		mainStr = append(mainStr, mainAddress)
@@ -118,4 +114,40 @@ func Retrieve(walletsAddr []string, walletsPemPath []string, mainAddress string,
 		}(i)
 	}
 	wg.Wait()
+}
+
+func CreateSwapTokensFixedInput(pemPath string, contract string, fromToken string, amount float32, toToken string, slippage float32, mode string) {
+	controller := GetController(mode)
+
+	fmt.Println("Amount before", amount)
+
+	fromTokenPriceFromApi := GetTokenPrice(fromToken, mode)
+	toTokenPriceFromApi := GetTokenPrice(toToken, mode)
+
+	// calculate fee of provider
+	providerFeePercent := float32(viper.GetFloat64(mode + ".contract-fee"))
+	feeInEgld := (amount / 100) * providerFeePercent
+	fmt.Println("fee in egld: ", feeInEgld)
+
+	tokenFromQty := fromTokenPriceFromApi.Price.Mul(decimal.NewFromFloat32(amount).Sub(decimal.NewFromFloat32(feeInEgld)))
+
+	tokensToBuyNoSlippage := tokenFromQty.Div(toTokenPriceFromApi.Price)
+	tokensToBuy := tokensToBuyNoSlippage.Sub(tokensToBuyNoSlippage.Div(decimal.NewFromInt(100)).Mul(decimal.NewFromFloat32(slippage)))
+	fmt.Println("Tokens to buy approx:", tokensToBuy)
+	fmt.Println("Amount", amount)
+
+	result, err := controller.Service.CreateSwapTokensFixedInput(pemPath, contract, fromToken, decimal.NewFromFloat32(amount), toToken, tokensToBuy, fromTokenPriceFromApi.Decimals, toTokenPriceFromApi.Decimals)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("[", result.Status, "]", result.Hash)
+}
+
+func GetAccount(address string, mode string) float64 {
+	controller := GetController(mode)
+	tokenTotal, err := controller.Service.GetAccount(address)
+	if err != nil {
+		return 0
+	}
+	return tokenTotal
 }

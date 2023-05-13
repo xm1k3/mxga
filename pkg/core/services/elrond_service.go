@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path"
@@ -209,7 +210,72 @@ func (m MultiversxService) GetTrxStatus(hash string) (string, error) {
 	}
 }
 
-func (m MultiversxService) GetAccount(address string) (string, error) {
+func (m MultiversxService) GetAccount(address string) (float64, error) {
+	args := blockchain.ArgsProxy{
+		ProxyURL:            m.ProxyUrl,
+		Client:              nil,
+		SameScState:         false,
+		ShouldBeSynced:      false,
+		FinalityCheck:       false,
+		CacheExpirationTime: time.Minute,
+		EntityType:          mxcore.Proxy,
+	}
+	ep, err := blockchain.NewProxy(args)
+	if err != nil {
+		return 0, err
+	}
+
+	networkConfig, err := ep.GetNetworkConfig(context.Background())
+	if err != nil {
+		return 0, err
+	}
+
+	addr, err := data.NewAddressFromBech32String(address)
+	if err != nil {
+		return 0, err
+	}
+
+	accountInfo, err := ep.GetAccount(context.Background(), addr)
+	if err != nil {
+		return 0, err
+	}
+
+	floatBalance, err := accountInfo.GetBalance(networkConfig.Denomination)
+	if err != nil {
+		return 0, err
+	}
+	floatBalance = floatBalance - 0.02
+	return floatBalance, nil
+}
+
+func (m MultiversxService) CreateSwapTokensFixedInput(pemPath string, contract string, fromToken string, amount decimal.Decimal, toToken string, slippage decimal.Decimal, fromDecimals int, toDecimals int) (core.SwapResult, error) {
+	toAddress, err := data.NewAddressFromBech32String(contract)
+	if err != nil {
+		return core.SwapResult{}, err
+	}
+
+	fromEgldValueStr := "1"
+	for i := 0; i < fromDecimals; i++ {
+		fromEgldValueStr += "0"
+	}
+
+	toEgldValueStr := "1"
+	for i := 0; i < toDecimals; i++ {
+		toEgldValueStr += "0"
+	}
+
+	fromEgldValue, err := decimal.NewFromString(fromEgldValueStr)
+	if err != nil {
+		return core.SwapResult{}, err
+	}
+
+	toEgldValue, err := decimal.NewFromString(toEgldValueStr)
+	if err != nil {
+		return core.SwapResult{}, err
+	}
+	amount = amount.Mul(fromEgldValue)
+	slippage = slippage.Mul(toEgldValue)
+
 	args := blockchain.ArgsProxy{
 		ProxyURL:            m.ProxyUrl,
 		Client:              nil,
@@ -221,25 +287,118 @@ func (m MultiversxService) GetAccount(address string) (string, error) {
 	}
 	ep, err := blockchain.NewProxy(args)
 
-	networkConfig, err := ep.GetNetworkConfig(context.Background())
 	if err != nil {
-		return "", err
+		return core.SwapResult{}, err
+	}
+	w := interactors.NewWallet()
+
+	bytePrivateKey, err := utils.ReadPrivateKey(pemPath)
+	if err != nil {
+		return core.SwapResult{}, err
+	}
+	privateKey, err := w.LoadPrivateKeyFromPemData(bytePrivateKey)
+	if err != nil {
+		return core.SwapResult{}, err
+	}
+	// Generate address from private key
+	address, err := w.GetAddressFromPrivateKey(privateKey)
+	if err != nil {
+		return core.SwapResult{}, err
 	}
 
-	addr, err := data.NewAddressFromBech32String(address)
+	netConfigs, err := ep.GetNetworkConfig(context.Background())
 	if err != nil {
-		return "", err
+		return core.SwapResult{}, err
 	}
 
-	accountInfo, err := ep.GetAccount(context.Background(), addr)
+	transactionArguments, err := ep.GetDefaultTransactionArguments(context.Background(), address, netConfigs)
 	if err != nil {
-		return "", err
+		return core.SwapResult{}, err
+	}
+	transactionArguments.RcvAddr = toAddress.AddressAsBech32String()
+	transactionArguments.Value = "0"
+
+	data := m.SwapTokensFixedInputData(fromToken, amount, toToken, slippage)
+	transactionArguments.Data = []byte(data)
+	transactionArguments.GasLimit = 50000000
+
+	txBuilder, err := builders.NewTxBuilder(cryptoProvider.NewSigner())
+	if err != nil {
+		return core.SwapResult{}, err
 	}
 
-	floatBalance, err := accountInfo.GetBalance(networkConfig.Denomination)
+	ti, err := interactors.NewTransactionInteractor(ep, txBuilder)
 	if err != nil {
-		return "", err
+		return core.SwapResult{}, err
 	}
-	floatBalance = floatBalance - 0.02
-	return fmt.Sprintf("%.6f", floatBalance), nil
+	holder, _ := cryptoProvider.NewCryptoComponentsHolder(keyGen, privateKey)
+	tx, err := ti.ApplySignatureAndGenerateTx(holder, transactionArguments)
+	if err != nil {
+		return core.SwapResult{}, err
+	}
+	ti.AddTransaction(tx)
+
+	hashes, err := ti.SendTransaction(context.Background(), tx)
+	if err != nil {
+		return core.SwapResult{}, err
+	}
+
+	status, err := m.GetContractStatus(hashes)
+	if err != nil {
+		return core.SwapResult{}, err
+	}
+	return core.SwapResult{
+		Status: status,
+		Hash:   hashes,
+	}, nil
+}
+
+func (m MultiversxService) SwapTokensFixedInputData(fromToken string, amount decimal.Decimal, toToken string, slippage decimal.Decimal) string {
+	fromTokenHex := hex.EncodeToString([]byte(fromToken))
+	amountHex := fmt.Sprintf("%x", amount.BigInt())
+	if len(amountHex)%2 != 0 {
+		amountHex = "0" + amountHex
+	}
+	methodHex := hex.EncodeToString([]byte("swapTokensFixedInput"))
+	toTokenHex := hex.EncodeToString([]byte(toToken))
+	slippageHex := fmt.Sprintf("%x", slippage.BigInt())
+	if len(slippageHex)%2 != 0 {
+		slippageHex = "0" + slippageHex
+	}
+
+	finalStr := "ESDTTransfer@" + string(fromTokenHex) + "@" + string(amountHex) + "@" + string(methodHex) + "@" + string(toTokenHex) + "@" + string(slippageHex)
+	return finalStr
+}
+
+func (m MultiversxService) GetContractStatus(hash string) (string, error) {
+	args := blockchain.ArgsProxy{
+		ProxyURL:            m.ProxyUrl,
+		Client:              nil,
+		SameScState:         false,
+		ShouldBeSynced:      false,
+		FinalityCheck:       false,
+		CacheExpirationTime: time.Minute,
+		EntityType:          mxcore.Proxy,
+	}
+	ep, err := blockchain.NewProxy(args)
+	if err != nil {
+		return "fail", err
+	}
+
+	for {
+		result, err := ep.GetTransactionInfoWithResults(context.Background(), hash)
+		// fmt.Printf("%+v %+v\n", result, err)
+
+		if err == nil {
+			if result.Data.Transaction.Status != "pending" {
+				if len(result.Data.Transaction.ScResults) > 0 {
+					return "success", nil
+				} else {
+					return "fail", nil
+				}
+			}
+		}
+
+		time.Sleep(1 * time.Second)
+	}
 }
