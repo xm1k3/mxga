@@ -7,6 +7,7 @@ Usage:
 Available Commands:
   help        Help about any command
   retrieve    retrieve back money from all wallets
+  swap        Manual swap
   trx         Send multiple transactions
   wallet      Create new wallets
 ```
@@ -37,15 +38,22 @@ wallet:
     # this if for transactions optimizations
     - erd1k7sp2wv2wreq2hm52lqyws46rjpehj6fjvav4g5w5hrwvf8s4cxqwzjchc
     - erd1e96l2qkz8h9yuzupu05yeydjlrmy0fkdas98c5fp4x2gczh2lc3sh6qerc
-    - erd1cy2eq9gsct6jlugrtemxj36q5vqdwmdzx83z4kcz3j3jfksryseq8fpzs6
-    - erd19rhl5gt6u5k6xh5mkaf3kkduc2se023wpqhcn67s2kh5f8v6jqrqpl7hqc
-    - erd1wdsu4tallng55s8ugnw7d9s7qvn2hegrnmu6mm5f68r59dzthmds45gp6g
-    - erd1w2g8vlls0gup9jglmza7lks66ahsrzhp6k2dtyez0jtym5r4wqascpxxxw
-    - erd1uhhrja9ymwpa3qrpkwaxk9ua3r0m00l4npuzdsa4t0vryp22rgtstnal39
-    - erd1cjmvxmvzmet5q02tan35nnydpscen6swtmjz689mxu9dyjynkktq9l7ds8
-    - erd1k72l5l4hxvl2yrar5qrz6yunluyakmc55qhlkdvy52k6lyjqdmhqvwvvqk
-    - erd1qfzvxu439amtcf5ysl6hsck235yc0j3vwq3vrmgy69pdtr7e584qlz8jfp
+    - ...
 
+devnet:
+  # contract address where to make swaps
+  contract: {EXCHANGE-CONTRACT-ADDRESS}
+  # contract fee percentiage
+  contract-fee: 0.3
+  
+  swap:
+    # from / to identifiers
+    from: WEGLD-{CODE}
+    to: RIDE-{CODE}
+    # amount of {from} to swap (in this case WEGLD)
+    amount: 0.1
+    # slippage percentiage, 1 = 1%
+    slippage: 1
 ```
 
 ## Create new wallets:
@@ -66,7 +74,7 @@ Flags:
   -P, --password string   Default password for json wallet file (default "Password123")
 ```
 
-examples:
+Example usage:
 
 generate 1 wallet
 ```
@@ -85,6 +93,60 @@ mxga wallet --amount 10 --password YOUR_PASSWORD_HERE
 mxga wallet -a 10 -p YOUR_PASSWORD_HERE
 ```
 
+## Swap tokens
+
+The mxga tool introduces swap feature that allows for easy token swapping within the MultiverX network. This feature enables users to swap two tokens by simply paying the contract fees.
+
+#### Configuration:
+
+```yaml
+...
+devnet:
+  # Contract address where swaps are made
+  contract: erd1qqqqqqqqqqqqqpgqe{CONTRACT-ADDRESS}
+  # Contract fee percentage
+  contract-fee: 0.3
+  
+  swap:
+    # From / to identifiers
+    from: WEGLD-{CODE}
+    to: RIDE-{CODE}
+    # Amount of {from} to swap (e.g., WEGLD)
+    amount: 0.1
+    # Slippage percentage, where 1 = 1%
+    slippage: 1
+...
+```
+#### Command-Line Interface (CLI)
+
+Alternatively, you can perform swap transactions using the MXGA CLI. Simply run the following command:
+
+```
+mxga swap --help
+
+...
+
+Flags:
+      --all                buy all
+  -a, --amount float32     amount (default 0.5)
+  -c, --contract string    contract where to swap
+  -f, --from string        from
+  -h, --help               help for swap
+  -s, --slippage float32   slippage (default 1)
+  -t, --to string          to
+```
+
+Example usage:
+
+```
+mxga swap --amount 0.1 --from WEGLD-{CODE} --to RIDE-{CODE} --slippage 1 --contract {CONTRACT-ADDR}
+```
+
+Additional Information:
+
+- The --config flag can be used to specify a custom configuration file (default: $HOME/.config/mxga/mxga.yaml).
+- The -M, --mode flag allows you to specify the MultiverX mode (mainnet, testnet, devnet) (default: "mainnet").
+
 ## Make multiples transactions
 
 Mxga can do many transactions in seconds and manage them in the same time
@@ -101,7 +163,7 @@ Flags:
   -v, --value float32   value (default 0.1)
 ```
 
-Examples:
+Example usage:
 
 Send 0.5 EGLD to all your wallets present in "other" section on the mxga.yaml
 
