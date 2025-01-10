@@ -1,6 +1,6 @@
 module github.com/xm1k3/mxga
 
-go 1.19
+go 1.22
 
 require (
 	github.com/multiversx/mx-chain-crypto-go v1.2.6
